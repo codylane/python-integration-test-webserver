@@ -142,7 +142,7 @@ def list_endpoints():
     return False
 
 def usage():
-    print('USAGE: %s [start|status|stop]')
+    print('USAGE: %s [start|status|endpoints|stop]')
     sys.exit(0)
 
 def random_busy():
@@ -152,10 +152,8 @@ def random_idle():
     return random.randint(41,55)
 
 if __name__ == '__main__':
-
-    try:
-        action = sys.argv[1]
-    except:
+    action = sys.argv[1:]
+    if not action:
         usage()
 
     if action == 'start':
