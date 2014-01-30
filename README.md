@@ -9,4 +9,4 @@ This is still a work in progress and still needs lots of time to sort out.
 
 cloning
 =======
-When cloning this repo, make sure to rename otherwise the python interpreter will complain about not being able to find module paths.
+When cloning this repo, make sure to rename (removing the -) otherwise the python interpreter will complain about not being able to find module paths.
