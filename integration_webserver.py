@@ -10,6 +10,7 @@ from SocketServer import ThreadingMixIn
 from SocketServer import ForkingMixIn
 from signalhandler.SignalHandler import SignalHandler
 from daemon.daemon import Daemon
+import random
 
 def get_execution_path():
     abs_path = os.path.abspath(sys.argv[0])
@@ -17,38 +18,23 @@ def get_execution_path():
     return root_dir
 
 LISTEN     = ''
-PORT       = 48001
+PORT       = 48000
 PIDFILE    = get_execution_path() + '/webserver.pid'
 STDOUT_LOG = get_execution_path() + '/stdout.log'
 STDERR_LOG = get_execution_path() + '/stderr.log'
 
 class Endpoint(object):
-    _path = None
-    _callback = None
-
-    @property
-    def path(self):
-        return self._path
-
-    @path.setter
-    def path(self, path):
-        self._path = path
-
-    @property
-    def callback(self):
-        return self._callback
-
-    @callback.setter
-    def callback(self, callback):
-        self._callback = callback
+    def __init__(self, path, callback=None):
+        self.path = path
+        self.callback = callback
 
     def __repr__(self):
-        return 'Class:%s path:%s callback:%s' %(self.__class__.__name__, self._path, self._callback)
+        return 'Class=%s path=%s callback=%s' %(self.__class__.__name__, self.path, self.callback)
 
-class MyHTTPServer(ForkingMixIn, HTTPServer):
+class MyHTTPServer(HTTPServer):
     def __init__(self, host=LISTEN, port=PORT):
         HTTPServer.__init__(self, (host, port), MyHandler)
-        self._endpoints = []
+        self._endpoints = {}
         self._sig_handler = SignalHandler()
         self.register_default_sig_handlers()
 
@@ -58,13 +44,19 @@ class MyHTTPServer(ForkingMixIn, HTTPServer):
     def register_default_sig_handlers(self):
         self._sig_handler.register(signal.SIGTERM, self.stop)
         self._sig_handler.register(signal.SIGINT,  self.stop)
+        self._sig_handler.register(signal.SIGUSR1, self.list_endpoints)
 
     def run(self):
         try:
             self.serve_forever()
-        except:
+        except Exception as e:
             self.server_close()
             self.shutdown()
+
+    def list_endpoints(self):
+        for endpoint in self.endpoints():
+            print('listing endpoint: %s' %(endpoint))
+        self.run()
 
     def stop(self):
         stop_server()
@@ -72,7 +64,7 @@ class MyHTTPServer(ForkingMixIn, HTTPServer):
     def register_endpoint(self, path, return_val=None):
         if path not in self.endpoints():
             endpoint = Endpoint(path, return_val)
-            self._endpoints.append(endpoint)
+            self._endpoints[path] = endpoint
 
 class DaemonizeMyHTTPServer(Daemon):
     def run(self, server):
@@ -84,8 +76,9 @@ class DaemonizeMyHTTPServer(Daemon):
 class MyHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        if self.path in self.server._endpoints:
-            callback = server._endpoints.get('callback')
+        endpoints =  self.server.endpoints()
+        if self.path in endpoints:
+            callback = endpoints.get(self.path).callback
             self.send_valid_response(callback)
         else:
             self.send_invalid_response()
@@ -95,17 +88,20 @@ class MyHandler(BaseHTTPRequestHandler):
 
     def send_valid_response(self, callback):
         self.send_response(200)
-        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-type', 'text/plain')
         self.end_headers()
+        print('callback %s' %(callback))
         if callback is None:
             self.wfile.write('20')
-        else:
+        elif callable(callback):
             self.wfile.write(callback())
+        else:
+            self.wfile.write(callback)
         return
 
     def send_invalid_response(self):
         self.send_response(404)
-        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-type', 'text/plain')
         self.end_headers()
         return
 
@@ -138,9 +134,22 @@ def stop_server():
         return True
     return False
 
+def list_endpoints():
+    pid = status_server()
+    if pid:
+        os.kill(pid, signal.SIGUSR1)
+        return True
+    return False
+
 def usage():
     print('USAGE: %s [start|status|stop]')
     sys.exit(0)
+
+def random_busy():
+    return random.randint(1,40)
+
+def random_idle():
+    return random.randint(41,55)
 
 if __name__ == '__main__':
 
@@ -151,19 +160,25 @@ if __name__ == '__main__':
 
     if action == 'start':
         server = MyHTTPServer(LISTEN, PORT)
+        print('starting up server http://%s:%s' %(LISTEN, PORT))
         server.register_endpoint('/twiddle/get.op?objectName=bean:name=datasource&attributeName=MaxPoolSize', 55)
         server.register_endpoint('/twiddle/get.op?objectName=bean:name=datasource&attributeName=MinPoolSize', 50)
-        server.register_endpoint('/twiddle/get.op?objectName=bean:name=datasource&attributeName=NumBusyConnections')
-        server.register_endpoint('/twiddle/get.op?objectName=bean:name=datasource&attributeName=NumIdleConnections')
+        server.register_endpoint('/twiddle/get.op?objectName=bean:name=datasource&attributeName=NumBusyConnections', random_busy)
+        server.register_endpoint('/twiddle/get.op?objectName=bean:name=datasource&attributeName=NumIdleConnections', random_idle) 
         start_server()
     elif action == 'status':
         pid = status_server()
-        if pid is not None:
+        if pid:
             print('server running on port %s, pid %s' %(PORT, pid))
             sys.exit(0)
         else:
             print('server is not running.')
             sys.exit(2)
+    elif action == 'endpoints':
+        if list_endpoints():
+            print('check your stdout.log')
+        else:
+            print('unable to list endpoints, server not runnin?')
     elif action == 'stop':
         if stop_server() is False:
             print('server is not running, nothing to stop')
