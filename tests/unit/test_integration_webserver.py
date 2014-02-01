@@ -182,9 +182,11 @@ class MyHTTPServer():
                 %(callback, actual_endpoint.callback)
 
     def test_register_default_sig_handlers_to_register_three_default_SignalHandler_instaces(self):
-        # register_default_sig_handlers is calle by the constructor so this method
-        # should have already been called
+        # register_default_sig_handlers is called by the constructor so this method
+        # should have already been called, but we will invoke it anyway just to be
+        # safe.
         srv = intweb.MyHTTPServer()
+        srv.register_default_sig_handlers()
         srv.server_close()
         expected_reg_count = 3
         actual_actions = srv._sig_handler.getActions()
@@ -212,3 +214,5 @@ class MyHTTPServer():
             assert value == 1, 'Expected that signal "%s" be registered as ' \
                     'a default when register_default_sig_handlers() ' \
                     'is called' %(key)
+
+
