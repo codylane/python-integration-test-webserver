@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+
 from __future__ import print_function
 import os
 import sys
@@ -13,23 +14,29 @@ from daemon.daemon import Daemon
 import random
 
 def get_execution_path():
-    abs_path = os.path.abspath(sys.argv[0])
+    abs_path = os.path.abspath(__file__)
     root_dir = os.path.dirname(abs_path)
     return root_dir
 
-LISTEN     = ''
+LISTEN     = '0.0.0.0'
 PORT       = 48000
 PIDFILE    = get_execution_path() + '/webserver.pid'
 STDOUT_LOG = get_execution_path() + '/stdout.log'
 STDERR_LOG = get_execution_path() + '/stderr.log'
 
 class Endpoint(object):
-    def __init__(self, path, callback=None):
+    def __init__(self, path, value=None, callback=None):
         self.path = path
+        self.value = value
         self.callback = callback
 
     def __repr__(self):
-        return 'Class=%s path=%s callback=%s' %(self.__class__.__name__, self.path, self.callback)
+        tostring = 'Class=%s' %(self.__class__.__name__)
+        for key, value in self.__dict__.items():
+            tostring += " %s=%s" %(key, value)
+        return 'Class=%s path=%s value=%s callback=%s' \
+                %(self.__class__.__name__, \
+                  self.path, self.value, self.callback)
 
 class MyHTTPServer(HTTPServer):
     def __init__(self, host=LISTEN, port=PORT):
@@ -61,9 +68,9 @@ class MyHTTPServer(HTTPServer):
     def stop(self):
         stop_server()
 
-    def register_endpoint(self, path, return_val=None):
+    def register_endpoint(self, path, return_val=None, callback=None):
         if path not in self.endpoints():
-            endpoint = Endpoint(path, return_val)
+            endpoint = Endpoint(path, return_val, callback)
             self._endpoints[path] = endpoint
 
 class DaemonizeMyHTTPServer(Daemon):
@@ -152,9 +159,9 @@ def random_idle():
     return random.randint(41,55)
 
 if __name__ == '__main__':
-    action = sys.argv[1:]
-    if not action:
+    if not sys.argv[1:]:
         usage()
+    action = sys.argv[1]
 
     if action == 'start':
         server = MyHTTPServer(LISTEN, PORT)
@@ -186,5 +193,6 @@ if __name__ == '__main__':
         sys.exit(0)
     else:
         usage()
-# if we get here just exit 0
-sys.exit(0)
+
+    # if we get here just exit 0
+    sys.exit(0)
