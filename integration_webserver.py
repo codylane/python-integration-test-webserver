@@ -44,6 +44,7 @@ class MyHTTPServer(HTTPServer):
         self._endpoints = {}
         self._sig_handler = SignalHandler()
         self.register_default_sig_handlers()
+        self.running = False
 
     def endpoints(self):
         return self._endpoints
@@ -54,22 +55,25 @@ class MyHTTPServer(HTTPServer):
         self._sig_handler.register(signal.SIGUSR1, self.list_endpoints)
 
     def run(self):
+        if self.running: return
         try:
+            self.running = True
             self.serve_forever()
         except Exception as e:
             self.server_close()
             self.shutdown()
+            self.running = False
 
     def list_endpoints(self):
         for endpoint in self.endpoints():
             print('listing endpoint: %s' %(endpoint))
-        self.run()
+        if self.running: self.run()
 
     def stop(self):
         stop_server()
 
     def register_endpoint(self, path, return_val=None, callback=None):
-        if path not in self.endpoints():
+        if path and path not in self.endpoints():
             endpoint = Endpoint(path, return_val, callback)
             self._endpoints[path] = endpoint
 
