@@ -1,10 +1,29 @@
 import integration_webserver.integration_webserver as intweb
+from integration_webserver.integration_webserver import MyHTTPServer
 import os
 import sys
 import signal
 from socket import gaierror
-from nose.tools import raises, istest
+from nose.tools import raises, istest, nottest
 from nose_parameterized import parameterized
+from mock import patch
+
+@nottest
+def capture_stdout(callback, out=sys.stdout, *callback_args):
+    from StringIO import StringIO
+    saved_stdout = out
+    try:
+        out = StringIO()
+        sys.stdout = out
+        if callback_args:
+            callback(callback_args)
+        else:
+            callback()
+        output = out.getvalue().strip()
+        return output
+    finally:
+        print('exception occured in capture_stdout')
+        sys.stdout = saved_stdout
 
 def is_module_present(name):
     v = intweb.__dict__.get(name)
@@ -215,4 +234,59 @@ class MyHTTPServer():
                     'a default when register_default_sig_handlers() ' \
                     'is called' %(key)
 
+    def test_list_endpoints_return_None(self):
+        srv = intweb.MyHTTPServer()
+        actual = srv.list_endpoints()
+        srv.server_close()
+        assert actual is None, 'Expected that list_endpoints() to return None, not "%s"' %(actual)
+
+    def test_list_endpoints_displays_endpoints_to_stdout(self):
+        srv = intweb.MyHTTPServer()
+        srv.register_endpoint('/foobar', 30)
+        srv.register_endpoint('/foobar_nation', 31)
+        actual = capture_stdout(srv.list_endpoints)
+        srv.server_close()
+        assert actual.find("listing endpoint:") >= 0, 'Expected that stdout contain: "listening endpoint" but got "%s" instead' %(actual)
+
+    @patch.object(intweb.MyHTTPServer, 'run', return_value=None)
+    def test_run_is_called_once(self, mock_method):
+        srv = intweb.MyHTTPServer()
+        srv.run()
+        srv.server_close()
+        assert mock_method.call_count == 1, 'Expected that run() be ' \
+                'called at leaset once, instead it was ' \
+                'called "%s" times' %(mock_method.call_count)
+
+    @patch.object(intweb.MyHTTPServer, 'run', return_value=None)
+    @raises(Exception)
+    def test_run_is_called_twice_and_raises_Exception(self, mock_method):
+        srv = intweb.MyHTTPServer()
+        srv.run()
+        srv.server_close()
+        mock_method.side_effect = Exception
+        srv.run()
+        srv.server_close()
+
+    @raises(TypeError)
+    def  test_register_endpoint_requires_one_argument_when_called_which_should_raise_TypeError(self):
+        srv = intweb.MyHTTPServer()
+        srv.server_close()
+        srv.register_endpoint()
+
+    def test_register_endpoint_should_not_register_endpoint_when_path_is_None(self):
+        srv = intweb.MyHTTPServer()
+        srv.server_close()
+        srv.register_endpoint(None)
+        actual_endpoints = srv.endpoints()
+        assert not actual_endpoints, 'Expected when register_endpoint(path=%s) should not register this endpoint, instead "%s" endpoint(s) are registered' %(None, actual_endpoints)
+        assert 'None' not in actual_endpoints, 'Expected that "%s" to not be in endpoints, but endpoints current has "%s"' %(None, actual_endpoints)
+
+    def test_register_endpoint_default_argument_return_value_set_to_None(self):
+        assert False
+
+    def test_register_endpoint_default_argument_callback_set_to_None(self):
+        assert False
+
+    def test_register_endpoint_registers_Endpoint_objects(self):
+        assert False
 
