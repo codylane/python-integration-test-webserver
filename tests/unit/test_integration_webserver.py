@@ -281,12 +281,22 @@ class MyHTTPServer():
         assert not actual_endpoints, 'Expected when register_endpoint(path=%s) should not register this endpoint, instead "%s" endpoint(s) are registered' %(None, actual_endpoints)
         assert 'None' not in actual_endpoints, 'Expected that "%s" to not be in endpoints, but endpoints current has "%s"' %(None, actual_endpoints)
 
-    def test_register_endpoint_default_argument_return_value_set_to_None(self):
-        assert False
-
-    def test_register_endpoint_default_argument_callback_set_to_None(self):
-        assert False
-
-    def test_register_endpoint_registers_Endpoint_objects(self):
-        assert False
+    @parameterized.expand([
+        ('/path', None, None),
+        ('/path', 30,   None),
+        ('/path', 30,   lambda d: d > 0),
+    ])
+    def test_register_endpoint_registers_Endpoint_objects(self, path, value, callback):
+        assert path is not None, 'Expected path to not be None, we should already have a test for that'
+        srv = intweb.MyHTTPServer()
+        srv.server_close()
+        srv.register_endpoint(path, value, callback)
+        actual_endpoint = srv.endpoints().get(path)
+        assert isinstance(actual_endpoint, intweb.Endpoint), 'Expected that register_endpoint(%s, %s, %s) would register an Endpoint object not "%s"' %(path, value, callback, type(actual_endpoint))
+        actual_path = actual_endpoint.path
+        assert actual_path == path, 'Expected register_endpoint(%s, %s, %s) path to be "%s" not "%s"' %(path, value, callback, path, actual_path)
+        actual_value = actual_endpoint.value
+        assert actual_value == value, 'Expected register_endpoint(%s, %s, %s) value to be "%s" not "%s"' %(path, value, callback, value, actual_value)
+        actual_callback = actual_endpoint.callback
+        assert actual_callback == callback, 'Expected register_endpoint(%s, %s, %s) callback to be "%s" not "%s"' %(path, value, callback, callback, actual_callback)
 
